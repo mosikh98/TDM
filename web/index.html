@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark light">
+    <title>Twitch Drops Miner</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css?v=__APP_VERSION__">
+    <link rel="stylesheet" href="/static/auth.css?v=__APP_VERSION__">
+    <script src="/static/auth.js?v=__APP_VERSION__"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+
+<body>
+    <script>
+        // Applied before first paint so switching themes doesn't flash the old one on reload.
+        (function () {
+            try {
+                var saved = localStorage.getItem('tdm-theme');
+                if (saved === 'light' || saved === 'dark') document.documentElement.setAttribute('data-theme', saved);
+            } catch (e) { }
+        })();
+    </script>
+    <!-- Inline SVG sprite (Lucide-style strokes, no runtime icon CDN) -->
+    <svg class="icon-sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+        <symbol id="i-grid" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" />
+            <rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" />
+        </symbol>
+        <symbol id="i-layers" viewBox="0 0 24 24">
+            <path d="M12 2 2 7l10 5 10-5-10-5Z" /><path d="m2 12 10 5 10-5" /><path d="m2 17 10 5 10-5" />
+        </symbol>
+        <symbol id="i-gift" viewBox="0 0 24 24">
+            <rect x="3" y="8" width="18" height="13" rx="2" /><path d="M12 8v13" /><path d="M3 12h18" />
+            <path d="M12 8H7.5a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8Z" /><path d="M12 8h4.5a2.5 2.5 0 0 0 0-5C13 3 12 8 12 8Z" />
+        </symbol>
+        <symbol id="i-radio" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="2" /><path d="M7.8 16.2a6 6 0 0 1 0-8.4" /><path d="M16.2 7.8a6 6 0 0 1 0 8.4" />
+            <path d="M4.9 19.1a10 10 0 0 1 0-14.2" /><path d="M19.1 4.9a10 10 0 0 1 0 14.2" />
+        </symbol>
+        <symbol id="i-box" viewBox="0 0 24 24">
+            <path d="M21 8v8a2 2 0 0 1-1 1.73l-7 4a2 2 0 0 1-2 0l-7-4A2 2 0 0 1 3 16V8a2 2 0 0 1 1-1.73l7-4a2 2 0 0 1 2 0l7 4A2 2 0 0 1 21 8Z" />
+            <path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" />
+        </symbol>
+        <symbol id="i-sliders" viewBox="0 0 24 24">
+            <path d="M4 21v-7" /><path d="M4 10V3" /><path d="M12 21v-9" /><path d="M12 8V3" /><path d="M20 21v-5" />
+            <path d="M20 12V3" /><path d="M1 14h6" /><path d="M9 8h6" /><path d="M17 16h6" />
+        </symbol>
+        <symbol id="i-help" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" /><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3" /><path d="M12 17h.01" />
+        </symbol>
+        <symbol id="i-menu" viewBox="0 0 24 24">
+            <path d="M4 6h16" /><path d="M4 12h16" /><path d="M4 18h16" />
+        </symbol>
+        <symbol id="i-bell" viewBox="0 0 24 24">
+            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+        </symbol>
+        <symbol id="i-moon" viewBox="0 0 24 24">
+            <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
+        </symbol>
+        <symbol id="i-sun" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="4" /><path d="M12 2v2" /><path d="M12 20v2" /><path d="m4.9 4.9 1.4 1.4" />
+            <path d="m17.7 17.7 1.4 1.4" /><path d="M2 12h2" /><path d="M20 12h2" /><path d="m6.3 17.7-1.4 1.4" />
+            <path d="m19.1 4.9-1.4 1.4" />
+        </symbol>
+        <symbol id="i-logout" viewBox="0 0 24 24">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5" /><path d="M21 12H9" />
+        </symbol>
+        <symbol id="i-clock" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
+        </symbol>
+        <symbol id="i-users" viewBox="0 0 24 24">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </symbol>
+        <symbol id="i-check" viewBox="0 0 24 24">
+            <path d="M20 6 9 17l-5-5" />
+        </symbol>
+        <symbol id="i-check-circle" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" /><path d="m8 12 3 3 5-6" />
+        </symbol>
+        <symbol id="i-x" viewBox="0 0 24 24">
+            <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+        </symbol>
+        <symbol id="i-x-circle" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" /><path d="m15 9-6 6" /><path d="m9 9 6 6" />
+        </symbol>
+        <symbol id="i-alert" viewBox="0 0 24 24">
+            <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+            <path d="M12 9v4" /><path d="M12 17h.01" />
+        </symbol>
+        <symbol id="i-chevron-right" viewBox="0 0 24 24">
+            <path d="m9 18 6-6-6-6" />
+        </symbol>
+        <symbol id="i-arrow-right" viewBox="0 0 24 24">
+            <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+        </symbol>
+        <symbol id="i-external" viewBox="0 0 24 24">
+            <path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+        </symbol>
+        <symbol id="i-refresh" viewBox="0 0 24 24">
+            <path d="M21 12a9 9 0 1 1-2.6-6.4" /><path d="M21 3v6h-6" />
+        </symbol>
+        <symbol id="i-trash" viewBox="0 0 24 24">
+            <path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+        </symbol>
+        <symbol id="i-warning" viewBox="0 0 24 24">
+            <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+            <path d="M12 9v4" /><path d="M12 17h.01" />
+        </symbol>
+        <symbol id="i-console" viewBox="0 0 24 24">
+            <rect x="2" y="4" width="20" height="16" rx="2" /><path d="m6 9 4 3-4 3" /><path d="M13 15h5" />
+        </symbol>
+        <symbol id="i-terminal" viewBox="0 0 24 24">
+            <path d="m4 17 6-6-6-6" /><path d="M12 19h8" />
+        </symbol>
+        <symbol id="i-trophy" viewBox="0 0 24 24">
+            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+            <path d="M4 22h16" /><path d="M10 14.7V17a2 2 0 0 1-1.5 2H8v3h8v-3h-.5a2 2 0 0 1-1.5-2v-2.3" />
+            <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+        </symbol>
+        <symbol id="i-activity" viewBox="0 0 24 24">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+        </symbol>
+        <symbol id="i-sparkle" viewBox="0 0 24 24">
+            <path d="M12 3v4" /><path d="M12 17v4" /><path d="M3 12h4" /><path d="M17 12h4" />
+            <path d="m5.6 5.6 2.8 2.8" /><path d="m15.6 15.6 2.8 2.8" /><path d="m18.4 5.6-2.8 2.8" />
+            <path d="m8.4 15.6-2.8 2.8" />
+        </symbol>
+        <symbol id="i-play" viewBox="0 0 24 24">
+            <path d="m6 4 14 8-14 8V4Z" />
+        </symbol>
+        <symbol id="i-eye" viewBox="0 0 24 24">
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" />
+        </symbol>
+        <symbol id="i-drop" viewBox="0 0 24 24">
+            <path d="M12 2.7 6.7 8a7.5 7.5 0 1 0 10.6 0L12 2.7Z" />
+        </symbol>
+        <symbol id="i-user" viewBox="0 0 24 24">
+            <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+        </symbol>
+        <symbol id="i-logo" viewBox="0 0 24 24">
+            <path d="M12 2.7 6.7 8a7.5 7.5 0 1 0 10.6 0L12 2.7Z" /><path d="M12 9v5" /><path d="M12 17h.01" />
+        </symbol>
+    </svg>
+
+    <div class="app">
+        <!-- ============ Sidebar ============ -->
+        <aside class="sidebar" id="app-sidebar">
+            <div class="brand">
+                <span class="brand-mark"><svg class="icon"><use href="#i-logo"></use></svg></span>
+                <span class="brand-text">
+                    <span class="brand-title">Twitch Drops Miner</span>
+                    <span class="brand-tagline">Automate • Watch • Earn</span>
+                </span>
+            </div>
+
+            <nav class="nav" aria-label="Main navigation">
+                <span class="nav-caption">Menu</span>
+                <button type="button" class="tab-button nav-item active" data-tab="main">
+                    <svg class="icon"><use href="#i-grid"></use></svg>
+                    <span class="nav-label">Dashboard</span>
+                </button>
+                <button type="button" class="tab-button nav-item" data-tab="inventory">
+                    <svg class="icon"><use href="#i-layers"></use></svg>
+                    <span class="nav-label">Campaigns</span>
+                </button>
+                <button type="button" class="tab-button nav-item" data-tab="history">
+                    <svg class="icon"><use href="#i-gift"></use></svg>
+                    <span class="nav-label">Drops</span>
+                </button>
+                <button type="button" class="tab-button nav-item" data-tab="channels">
+                    <svg class="icon"><use href="#i-radio"></use></svg>
+                    <span class="nav-label">Channels</span>
+                </button>
+                <button type="button" class="tab-button nav-item" data-tab="rewards">
+                    <svg class="icon"><use href="#i-box"></use></svg>
+                    <span class="nav-label">Inventory</span>
+                </button>
+                <button type="button" class="tab-button nav-item" data-tab="settings">
+                    <svg class="icon"><use href="#i-sliders"></use></svg>
+                    <span class="nav-label">Settings</span>
+                </button>
+
+                <span class="nav-caption nav-caption-secondary">Resources</span>
+                <button type="button" class="tab-button nav-item nav-item-quiet" data-tab="help">
+                    <svg class="icon"><use href="#i-help"></use></svg>
+                    <span class="nav-label">Help</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-status">
+                <span class="status-dot" aria-hidden="true"></span>
+                <span class="sidebar-status-text">
+                    <strong>Miner Online</strong>
+                    <small id="sidebar-status">Running smoothly...</small>
+                </span>
+            </div>
+        </aside>
+        <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
+
+        <!-- ============ Workspace ============ -->
+        <div class="workspace">
+            <header class="topbar">
+                <button type="button" class="icon-btn menu-toggle" id="menu-toggle" aria-label="Open navigation"
+                    aria-controls="app-sidebar" aria-expanded="false">
+                    <svg class="icon"><use href="#i-menu"></use></svg>
+                </button>
+
+                <div class="topbar-title">
+                    <h1 id="view-title">Dashboard</h1>
+                    <div class="topbar-pills">
+                        <span id="connection-indicator" class="pill pill-success">● Connected</span>
+                        <span id="status-text" class="pill pill-quiet">Initializing...</span>
+                        <span id="auto-mode-badge" class="pill pill-accent" title="Automatic mode - following game priority">
+                            <svg class="icon icon-xs"><use href="#i-sparkle"></use></svg> AUTO
+                        </span>
+                        <span id="manual-mode-badge" class="pill pill-warn hidden"
+                            title="Manual mode active - watching specific game">
+                            <svg class="icon icon-xs"><use href="#i-eye"></use></svg> MANUAL:
+                            <span id="manual-game-name"></span>
+                        </span>
+                        <span id="proxy-indicator" class="pill pill-quiet" style="display: none;"
+                            title="Proxy connection active">
+                            <svg class="icon icon-xs"><use href="#i-radio"></use></svg> PROXY
+                        </span>
+                    </div>
+                </div>
+
+                <div class="topbar-actions">
+                    <div class="notif-wrap">
+                        <button type="button" class="icon-btn" id="notif-btn" aria-label="Notifications"
+                            aria-expanded="false" aria-haspopup="true" title="Notifications">
+                            <svg class="icon"><use href="#i-bell"></use></svg>
+                            <span class="notif-dot" id="notif-dot" hidden></span>
+                        </button>
+                        <div class="popover" id="notif-popover" hidden>
+                            <div class="popover-head">
+                                <span>Notifications</span>
+                                <button type="button" class="link-btn" id="notif-clear">Clear</button>
+                            </div>
+                            <div class="popover-body" id="notif-list"></div>
+                        </div>
+                    </div>
+
+                    <button type="button" class="icon-btn" id="theme-toggle" aria-label="Toggle light theme"
+                        title="Toggle light / dark theme">
+                        <svg class="icon icon-sun"><use href="#i-sun"></use></svg>
+                        <svg class="icon icon-moon"><use href="#i-moon"></use></svg>
+                    </button>
+
+                    <button type="button" class="icon-btn" id="settings-shortcut" aria-label="Settings"
+                        title="Settings">
+                        <svg class="icon"><use href="#i-sliders"></use></svg>
+                    </button>
+
+                    <span class="account-chip" id="account-chip" title="Twitch account">
+                        <span class="account-avatar"><svg class="icon icon-xs"><use href="#i-user"></use></svg></span>
+                        <span class="account-text">
+                            <strong id="account-name">Not logged in</strong>
+                            <small id="account-id" hidden></small>
+                        </span>
+                    </span>
+
+                    <label for="language" class="language-selector">
+                        <span>Language:</span>
+                        <select id="language">
+                            <option value="en">English</option>
+                        </select>
+                    </label>
+
+                    <button id="web-auth-logout" type="button" class="btn btn-ghost" data-auth-text="logout"
+                        hidden>Log out</button>
+                    <span id="web-auth-logout-result" role="status" aria-live="polite"></span>
+                </div>
+            </header>
+
+            <main class="content">
+                <!-- ==================== Dashboard ==================== -->
+                <div id="main-tab" class="tab-content active">
+                    <!-- Stat cards -->
+                    <div class="stat-grid">
+                        <article class="stat-card">
+                            <span class="stat-icon stat-icon-accent"><svg class="icon"><use href="#i-play"></use></svg></span>
+                            <div class="stat-body">
+                                <span class="stat-label">Mining</span>
+                                <span class="stat-value skeleton-text" id="stat-mining-value">—</span>
+                                <span class="stat-sub" id="stat-mining-sub">Waiting for data…</span>
+                            </div>
+                        </article>
+                        <article class="stat-card">
+                            <span class="stat-icon stat-icon-green"><svg class="icon"><use href="#i-trophy"></use></svg></span>
+                            <div class="stat-body">
+                                <span class="stat-label">Claimed Drops</span>
+                                <span class="stat-value skeleton-text" id="stat-drops-value">—</span>
+                                <span class="stat-sub" id="stat-drops-sub">Waiting for data…</span>
+                            </div>
+                        </article>
+                        <article class="stat-card">
+                            <span class="stat-icon stat-icon-blue"><svg class="icon"><use href="#i-users"></use></svg></span>
+                            <div class="stat-body">
+                                <span class="stat-label">Channels</span>
+                                <span class="stat-value skeleton-text" id="stat-channels-value">—</span>
+                                <span class="stat-sub" id="stat-channels-sub">Waiting for data…</span>
+                            </div>
+                        </article>
+                        <article class="stat-card">
+                            <span class="stat-icon stat-icon-gold"><svg class="icon"><use href="#i-clock"></use></svg></span>
+                            <div class="stat-body">
+                                <span class="stat-label">Next Drop</span>
+                                <span class="stat-value skeleton-text" id="stat-next-value">—</span>
+                                <span class="stat-sub" id="stat-next-sub">Waiting for data…</span>
+                            </div>
+                        </article>
+                    </div>
+
+                    <!-- Active Mining -->
+                    <section class="panel mining-panel">
+                        <div class="panel-head">
+                            <h2 id="progress-header">Active Mining</h2>
+                            <span class="pill pill-success" id="mining-live" hidden>
+                                <span class="pulse-dot"></span> ACTIVE MINING
+                            </span>
+                        </div>
+                        <div class="mining-body">
+                            <div class="mining-art">
+                                <img id="mining-art" alt="" hidden>
+                                <span class="mining-art-fallback" id="mining-art-fallback">
+                                    <svg class="icon"><use href="#i-play"></use></svg>
+                                </span>
+                            </div>
+                            <div class="mining-info" id="progress-container">
+                                <div id="no-drop-message" class="empty-state">
+                                    <svg class="icon"><use href="#i-activity"></use></svg>
+                                    <p>No active drop</p>
+                                    <small>The miner will start as soon as a campaign is available.</small>
+                                </div>
+                                <div id="drop-info" style="display: none;">
+                                    <div id="manual-mode-controls" class="manual-mode-controls hidden">
+                                        <div class="manual-mode-info">
+                                            <svg class="icon icon-xs"><use href="#i-eye"></use></svg>
+                                            Manual Mode: Mining <strong id="manual-mode-game"></strong>
+                                        </div>
+                                        <button id="exit-manual-btn" class="btn btn-ghost" type="button">Return to Auto
+                                            Mode</button>
+                                    </div>
+                                    <div class="drop-meta">
+                                        <span class="drop-game-chip" id="mining-game-chip"></span>
+                                        <span class="pill pill-warn" id="mining-claim-state" hidden>MINING</span>
+                                    </div>
+                                    <div class="drop-name" id="drop-name"></div>
+                                    <div class="drop-game" id="drop-game"></div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" id="progress-fill"></div>
+                                    </div>
+                                    <div class="progress-meta">
+                                        <span class="progress-text" id="progress-text"></span>
+                                        <span class="progress-time" id="progress-time"></span>
+                                    </div>
+                                    <div class="mining-channel" id="mining-channel-row" hidden>
+                                        <span class="mini-avatar" id="mining-channel-avatar" aria-hidden="true"></span>
+                                        <span class="mining-channel-name" id="mining-channel-name"></span>
+                                        <span class="mining-channel-viewers" id="mining-channel-viewers"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <div class="dash-grid">
+                        <!-- Active campaigns preview -->
+                        <section class="panel campaigns-preview span-2">
+                            <div class="panel-head">
+                                <h2>Active Campaigns</h2>
+                                <div class="chip-row" id="campaign-chips" role="tablist" aria-label="Campaign filters">
+                                    <button type="button" class="chip active" data-campaign-filter="all">All</button>
+                                    <button type="button" class="chip" data-campaign-filter="active">Active</button>
+                                    <button type="button" class="chip" data-campaign-filter="upcoming">Upcoming</button>
+                                    <button type="button" class="chip" data-campaign-filter="finished">Finished</button>
+                                </div>
+                            </div>
+                            <div class="campaign-preview-grid" id="campaigns-preview"></div>
+                            <div class="panel-foot">
+                                <button type="button" class="link-btn" id="goto-campaigns">View all campaigns
+                                    <svg class="icon icon-xs"><use href="#i-arrow-right"></use></svg>
+                                </button>
+                            </div>
+                        </section>
+
+                        <!-- Recent activity -->
+                        <section class="panel activity-panel">
+                            <div class="panel-head">
+                                <h2>Recent Activity</h2>
+                                <span class="panel-hint" id="activity-count"></span>
+                            </div>
+                            <ul class="activity-list" id="activity-list"></ul>
+                            <div class="empty-state empty-state-sm" id="activity-empty">
+                                <svg class="icon"><use href="#i-activity"></use></svg>
+                                <p>No activity yet</p>
+                                <small>Events show up here as the miner works.</small>
+                            </div>
+                        </section>
+
+                        <!-- Channels preview -->
+                        <section class="panel channels-preview-panel">
+                            <div class="panel-head">
+                                <h2>Channels</h2>
+                                <button type="button" class="link-btn" id="goto-channels">View all
+                                    <svg class="icon icon-xs"><use href="#i-arrow-right"></use></svg>
+                                </button>
+                            </div>
+                            <div class="channel-preview-list" id="channels-preview"></div>
+                            <div class="empty-state empty-state-sm" id="channels-preview-empty">
+                                <svg class="icon"><use href="#i-radio"></use></svg>
+                                <p>No channels tracked yet...</p>
+                            </div>
+                        </section>
+
+                        <!-- Inventory preview -->
+                        <section class="panel inventory-preview-panel">
+                            <div class="panel-head">
+                                <h2>Inventory</h2>
+                                <button type="button" class="link-btn" id="goto-inventory">View All
+                                    <svg class="icon icon-xs"><use href="#i-arrow-right"></use></svg>
+                                </button>
+                            </div>
+                            <div class="reward-strip" id="inventory-preview"></div>
+                            <div class="empty-state empty-state-sm" id="inventory-preview-empty">
+                                <svg class="icon"><use href="#i-box"></use></svg>
+                                <p>No rewards yet</p>
+                                <small>Claimed rewards appear here.</small>
+                            </div>
+                        </section>
+
+                        <!-- Wanted queue -->
+                        <section class="panel wanted-panel">
+                            <div class="panel-head">
+                                <h2 id="wanted-header">Wanted Drop Queue</h2>
+                            </div>
+                            <div id="wanted-items-list" class="wanted-items-list">
+                                <p class="empty-message-small">No wanted drops queued...</p>
+                            </div>
+                        </section>
+
+                        <!-- Login -->
+                        <section class="panel login-panel">
+                            <div class="panel-head">
+                                <h2>Login</h2>
+                                <span class="pill pill-quiet" id="login-state-pill">Twitch</span>
+                            </div>
+                            <div id="login-status" class="login-status"></div>
+                            <div id="login-form" style="display: none;">
+                                <input type="text" id="username" placeholder="Username" autocomplete="username" />
+                                <input type="password" id="password" placeholder="Password"
+                                    autocomplete="current-password" />
+                                <input type="text" id="2fa-token" placeholder="2FA Token (optional)"
+                                    autocomplete="one-time-code" />
+                                <button id="login-button" type="button" class="btn btn-primary">Login</button>
+                            </div>
+                            <div id="oauth-code-display" style="display: none;">
+                                <p>Enter this code at: <a id="oauth-url" href="#" target="_blank"
+                                        rel="noopener noreferrer">Twitch Activate</a></p>
+                                <div class="oauth-code" id="oauth-code"></div>
+                                <button id="oauth-confirm" type="button" class="btn btn-primary">I've entered the
+                                    code</button>
+                            </div>
+                        </section>
+
+                        <!-- Log output -->
+                        <section class="panel console-panel span-2">
+                            <div class="panel-head">
+                                <h2 id="console-header">Log Output</h2>
+                                <button type="button" class="btn btn-ghost btn-sm" id="log-clear-btn">
+                                    <svg class="icon icon-xs"><use href="#i-trash"></use></svg> Clear
+                                </button>
+                            </div>
+                            <div id="console-output" class="console-output" role="log" aria-live="polite"></div>
+                        </section>
+                    </div>
+                </div>
+
+                <!-- ==================== Campaigns (inventory filters + cards) ==================== -->
+                <div id="inventory-tab" class="tab-content">
+                    <div class="view-head">
+                        <div>
+                            <h2 class="view-title">Campaigns</h2>
+                            <p class="view-sub">Track every Twitch drops campaign linked to your account.</p>
+                        </div>
+                    </div>
+                    <div class="inventory-filters">
+                        <div class="filter-controls">
+                            <div class="filter-checkboxes">
+                                <label class="filter-checkbox">
+                                    <input type="checkbox" id="filter-active" />
+                                    <span>Active</span>
+                                </label>
+                                <label class="filter-checkbox">
+                                    <input type="checkbox" id="filter-not-linked" />
+                                    <span>Not Linked</span>
+                                </label>
+                                <label class="filter-checkbox">
+                                    <input type="checkbox" id="filter-upcoming" checked />
+                                    <span>Upcoming</span>
+                                </label>
+                                <label class="filter-checkbox">
+                                    <input type="checkbox" id="filter-expired" />
+                                    <span>Expired</span>
+                                </label>
+                                <label class="filter-checkbox">
+                                    <input type="checkbox" id="filter-finished" />
+                                    <span>Finished</span>
+                                </label>
+                                <div class="filter-separator"></div>
+                                <label class="filter-checkbox" title="Direct Entitlement (Game Item)">
+                                    <input type="checkbox" id="filter-benefit-item" checked />
+                                    <span>Item</span>
+                                </label>
+                                <label class="filter-checkbox">
+                                    <input type="checkbox" id="filter-benefit-badge" checked />
+                                    <span>Badge</span>
+                                </label>
+                                <label class="filter-checkbox">
+                                    <input type="checkbox" id="filter-benefit-emote" checked />
+                                    <span>Emote</span>
+                                </label>
+                                <label class="filter-checkbox">
+                                    <input type="checkbox" id="filter-benefit-other" checked />
+                                    <span>Other</span>
+                                </label>
+                            </div>
+                            <div class="filter-search">
+                                <div class="game-dropdown-container">
+                                    <div class="game-tags-display" id="selected-game-tags">
+                                        <!-- Selected game tags will appear here -->
+                                    </div>
+                                    <input type="text" id="inventory-game-search"
+                                        placeholder="Type to search games..." autocomplete="off" />
+                                    <div class="game-dropdown-list" id="game-dropdown-list">
+                                        <!-- Dropdown options will appear here -->
+                                    </div>
+                                </div>
+                                <button id="clear-filters-btn" class="btn btn-ghost btn-sm"
+                                    type="button">Clear Filters</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="inventory-grid" id="inventory-grid">
+                        <p class="empty-message">No campaigns loaded yet...</p>
+                    </div>
+                </div>
+
+                <!-- ==================== Channels ==================== -->
+                <div id="channels-tab" class="tab-content">
+                    <div class="view-head">
+                        <div>
+                            <h2 class="view-title" id="channels-header">Channels</h2>
+                            <p class="view-sub">Channels discovered for your watched games — click one to mine it.</p>
+                        </div>
+                    </div>
+                    <section class="panel">
+                        <div id="channels-list" class="channels-list"></div>
+                    </section>
+                </div>
+
+                <!-- ==================== Inventory (rewards) ==================== -->
+                <div id="rewards-tab" class="tab-content">
+                    <div class="view-head">
+                        <div>
+                            <h2 class="view-title">Inventory</h2>
+                            <p class="view-sub">Rewards available across your campaigns.</p>
+                        </div>
+                    </div>
+                    <div class="reward-grid" id="rewards-grid"></div>
+                    <div class="empty-state" id="rewards-empty">
+                        <svg class="icon"><use href="#i-box"></use></svg>
+                        <p>No rewards loaded yet...</p>
+                        <small>Rewards from active campaigns appear here.</small>
+                    </div>
+                </div>
+
+                <!-- ==================== Settings ==================== -->
+                <div id="settings-tab" class="tab-content">
+                    <div class="view-head">
+                        <div>
+                            <h2 class="view-title">Settings</h2>
+                            <p class="view-sub">Miner behaviour, notifications and account protection.</p>
+                        </div>
+                    </div>
+                    <div class="settings-container">
+                        <section class="settings-section">
+                            <h2 data-auth-text="title">Dashboard password</h2>
+                            <p id="web-auth-state"></p>
+                            <p class="help-text" data-auth-text="help">Protect this dashboard with one password.
+                                Changing it signs out other sessions. Disabling protection clears the password.</p>
+                            <form id="web-auth-settings" class="auth-form">
+                                <div id="web-auth-current-row" hidden>
+                                    <label for="web-auth-current" data-auth-text="current_password">Current
+                                        password</label>
+                                    <input id="web-auth-current" type="password" autocomplete="current-password"
+                                        maxlength="1024">
+                                </div>
+                                <label for="web-auth-new" data-auth-text="new_password">New password (at least 8
+                                    characters)</label>
+                                <input id="web-auth-new" type="password" autocomplete="new-password" minlength="8"
+                                    maxlength="1024" required>
+                                <label for="web-auth-confirm" data-auth-text="confirm_password">Confirm new
+                                    password</label>
+                                <input id="web-auth-confirm" type="password" autocomplete="new-password" minlength="8"
+                                    maxlength="1024" required>
+                                <button id="web-auth-save" type="submit" class="btn btn-primary"
+                                    data-auth-text="enable" disabled>Enable password protection</button>
+                                <button id="web-auth-disable" class="auth-secondary btn btn-ghost" type="button"
+                                    data-auth-text="disable" hidden>Disable protection and clear password</button>
+                                <p id="web-auth-result" role="status" aria-live="polite"></p>
+                            </form>
+                        </section>
+                        <section class="settings-section">
+                            <h2 id="settings-general-header">General</h2>
+                            <label class="setting-row">
+                                <input type="checkbox" id="dark-mode"> Dark Mode
+                            </label>
+                            <label class="setting-row">
+                                <input type="checkbox" id="inventory-list-view"> Inventory List View (horizontal rows
+                                instead of cards)
+                            </label>
+                            <label class="setting-row">
+                                Connection Quality:
+                                <input type="number" id="connection-quality" min="1" max="6" value="1">
+                            </label>
+                            <label class="setting-row">
+                                Minimum Refresh Interval (minutes):
+                                <input type="number" id="minimum-refresh-interval" min="1" max="1440" value="30">
+                            </label>
+                            <label class="setting-row">
+                                Proxy URL:
+                                <input type="text" id="proxy-url" placeholder="http://user:pass@host:port">
+                                <button id="set-proxy-btn" class="btn btn-ghost" type="button"
+                                    title="Set and verify proxy">Set Proxy</button>
+                                <button id="verify-proxy-btn" class="btn btn-ghost" type="button"
+                                    title="Test proxy connection">Verify</button>
+                            </label>
+                            <small class="help-text-inline">Leave empty to disable. Supports HTTP/HTTPS/SOCKS.</small>
+                            <div id="proxy-verify-result" class="verify-result" style="display: none;"></div>
+                        </section>
+
+                        <section class="settings-section">
+                            <h2 id="settings-telegram-header">Telegram Notifications</h2>
+                            <p id="settings-telegram-help" class="help-text">Configure drop claim notifications on
+                                Telegram.</p>
+                            <p id="settings-telegram-credentials-help" class="help-text">Leave the token blank to keep
+                                the saved token. To disable notifications, clear the Chat ID and save.</p>
+                            <label class="setting-row">
+                                <span id="settings-telegram-bot-token-label">Telegram Bot Token:</span>
+                                <input type="password" id="telegram-bot-token"
+                                    placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz">
+                                <small><span id="settings-telegram-get-from-botfather">Get from</span> <a
+                                        href="https://t.me/BotFather" target="_blank"
+                                        rel="noopener noreferrer">@BotFather</a></small>
+                            </label>
+                            <label class="setting-row">
+                                <span id="settings-telegram-chat-id-label">Telegram Chat ID:</span>
+                                <input type="text" id="telegram-chat-id" placeholder="Your numeric ID or @username">
+                                <small id="settings-telegram-your-user-id">Your Telegram user ID (usually starts with a
+                                    number)</small>
+                            </label>
+                            <div class="button-group">
+                                <button id="save-telegram-btn" class="btn btn-ghost" type="button"
+                                    title="Save Telegram settings">Save Settings</button>
+                                <button id="test-telegram-btn" class="btn btn-ghost" type="button"
+                                    title="Test Telegram connection">Test Connection</button>
+                            </div>
+                            <div id="telegram-test-result" class="verify-result" style="display: none;"></div>
+                            <h2 id="settings-benefits-header">Mining Benefits</h2>
+                            <p id="settings-benefits-help" class="help-text">Select which types of drops you want to
+                                mine.</p>
+                            <div class="benefits-filter filter-checkboxes">
+                                <label class="filter-checkbox" title="Detailed description: Direct Entitlement (Game
+                                    Item)">
+                                    <input type="checkbox" id="mining-benefit-item" checked />
+                                    <span>Item</span>
+                                </label>
+                                <label class="filter-checkbox">
+                                    <input type="checkbox" id="mining-benefit-badge" checked />
+                                    <span>Badge</span>
+                                </label>
+                                <label class="filter-checkbox">
+                                    <input type="checkbox" id="mining-benefit-emote" checked />
+                                    <span>Emote</span>
+                                </label>
+                                <label class="filter-checkbox">
+                                    <input type="checkbox" id="mining-benefit-unknown" checked />
+                                    <span>Other</span>
+                                </label>
+                            </div>
+                        </section>
+
+                        <section class="settings-section">
+                            <h2 id="settings-drop-blacklist-header">Ignored Drop Keywords</h2>
+                            <p id="settings-drop-blacklist-help" class="help-text">Enter one keyword per line. Matching
+                                drops and their dependent branches will not be mined.</p>
+                            <textarea id="drop-name-blacklist" rows="5"
+                                placeholder="(JP)&#10;[KR]&#10;Japan"></textarea>
+                        </section>
+
+                        <section class="settings-section">
+                            <h2 id="settings-games-header">Games to Watch</h2>
+                            <p id="settings-games-help" class="help-text">Select games to watch. Order matters - drag
+                                to reorder
+                                priority (top = highest
+                                priority).</p>
+
+                            <div class="games-filter">
+                                <input type="text" id="games-filter" placeholder="Search games..." />
+                                <div class="filter-actions">
+                                    <button id="select-all-btn" class="btn btn-ghost btn-sm" type="button">Select
+                                        All</button>
+                                    <button id="deselect-all-btn" class="btn btn-ghost btn-sm" type="button">Deselect
+                                        All</button>
+                                    <button id="add-game-btn" class="btn btn-ghost btn-sm" type="button">Add Game</button>
+                                </div>
+                            </div>
+
+                            <div class="games-container">
+                                <div class="selected-games">
+                                    <h3>Selected Games (drag to reorder)</h3>
+                                    <div id="selected-games-list" class="sortable-list"></div>
+                                </div>
+
+                                <div class="available-games">
+                                    <h3>Available Games</h3>
+                                    <div id="available-games-list" class="checkbox-list"></div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="settings-section">
+                            <h2 id="settings-actions-header">Actions</h2>
+                            <div class="settings-actions">
+                                <button id="reload-btn" class="action-button" type="button">Reload</button>
+                                <button id="clear-cache-btn" class="action-button" type="button">Clear All Cache</button>
+                            </div>
+                            <p id="clear-cache-help" class="help-text">Clears local campaign and channel data, keeps
+                                your login and settings, then reloads from Twitch.</p>
+                        </section>
+                    </div>
+                </div>
+
+                <!-- ==================== Help ==================== -->
+                <div id="help-tab" class="tab-content">
+                    <div class="help-content">
+                        <h2 id="help-about-header">About Twitch Drops Miner</h2>
+                        <p>This application automatically mines timed Twitch drops without downloading stream data.</p>
+
+                        <h3 id="help-howto-header">How to Use</h3>
+                        <ol>
+                            <li>Login using your Twitch account (OAuth device code flow)</li>
+                            <li>Link your accounts at <a href="https://www.twitch.tv/drops/campaigns"
+                                    target="_blank" rel="noopener noreferrer">twitch.tv/drops/campaigns</a></li>
+                            <li>The miner will automatically discover campaigns and start mining</li>
+                            <li>Configure priority games in Settings to focus on what you want</li>
+                            <li>Monitor progress in the Main and Inventory tabs</li>
+                        </ol>
+
+                        <h3 id="help-features-header">Features</h3>
+                        <ul>
+                            <li>Stream-less drop mining - saves bandwidth</li>
+                            <li>Game priority and exclusion lists</li>
+                            <li>Tracks up to 199 channels simultaneously</li>
+                            <li>Automatic channel switching</li>
+                            <li>Real-time progress tracking</li>
+                        </ul>
+
+                        <h3 id="help-notes-header">Important Notes</h3>
+                        <ul>
+                            <li>Do not watch streams on the same account while mining</li>
+                            <li>Keep your cookies.jar file secure</li>
+                            <li>Requires linked game accounts for drops</li>
+                        </ul>
+
+                        <h3>Telegram Notifications</h3>
+                        <p>Receive instant notifications on Telegram when you claim drops. Setup instructions:</p>
+                        <ol>
+                            <li>Go to <a href="https://t.me/BotFather" target="_blank"
+                                    rel="noopener noreferrer">@BotFather</a> on Telegram</li>
+                            <li>Create a new bot with /newbot command</li>
+                            <li>Save the bot token you receive</li>
+                            <li>Start your new bot by searching for it and clicking /start (or send any message)</li>
+                            <li>Get your Chat ID by opening this URL in browser (replace TOKEN):
+                                <code>https://api.telegram.org/botTOKEN/getUpdates</code></li>
+                            <li>Find your user ID in the response - it's the number in "from": {"id": YOUR_ID}</li>
+                            <li>Enter the token and Chat ID in Settings and click Test Connection</li>
+                        </ol>
+
+                        <div class="help-links">
+                            <a href="https://github.com/rangermix/TwitchDropsMiner" target="_blank"
+                                rel="noopener noreferrer">GitHub
+                                Repository</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== Drops (history) ==================== -->
+                <div id="history-tab" class="tab-content">
+                    <div class="view-head">
+                        <div>
+                            <h2 class="view-title" data-history-key="title">Drop History</h2>
+                            <p class="view-sub">Every drop this miner has claimed, with time spent.</p>
+                        </div>
+                    </div>
+                    <div class="history-toolbar">
+                        <div class="history-filters">
+                            <input id="history-filter-game" type="text" placeholder="Filter by game…"
+                                data-history-placeholder="filter_game" />
+                            <label for="history-filter-since" data-history-key="since">Claimed on or after (UTC)</label>
+                            <input id="history-filter-since" type="date" />
+                            <button id="history-btn-filter" class="btn btn-primary btn-sm" type="button"
+                                data-history-key="apply">Apply</button>
+                        </div>
+                        <div class="history-actions">
+                            <button id="history-btn-export" class="btn btn-ghost btn-sm" type="button"
+                                data-history-key="export">⬇ Export CSV</button>
+                            <button id="history-btn-stats" class="btn btn-ghost btn-sm" type="button"
+                                data-history-key="stats">📊 Stats</button>
+                            <button id="history-btn-clear" class="btn btn-danger btn-sm" type="button"
+                                data-history-key="clear">🗑 Clear</button>
+                        </div>
+                    </div>
+
+                    <div id="history-stats-error" role="status"></div>
+                    <div id="history-stats-panel" class="history-stats-panel" style="display: none;">
+                        <div class="history-stats-inner">
+                            <div class="history-stat-total">
+                                <div class="history-stat-number" id="stats-total">–</div>
+                                <div data-history-key="total" class="history-stat-label">Total drops claimed</div>
+                            </div>
+                            <div id="stats-by-game" class="history-stat-col"></div>
+                            <div id="stats-by-month" class="history-stat-col"></div>
+                        </div>
+                    </div>
+
+                    <div class="history-count-row">
+                        <span id="history-count"></span>
+                    </div>
+
+                    <div class="table-scroll">
+                        <table id="history-table" class="history-table">
+                            <thead>
+                                <tr>
+                                    <th data-history-key="claimed_at">Date &amp; Time</th>
+                                    <th data-history-key="game">Game</th>
+                                    <th data-history-key="campaign">Campaign</th>
+                                    <th data-history-key="drop">Drop</th>
+                                    <th data-history-key="rewards">Rewards</th>
+                                    <th data-history-key="minutes" class="num">Minutes</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-tbody">
+                                <tr>
+                                    <td colspan="6" class="table-empty">Loading history…</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="history-pagination" id="history-pagination"></div>
+                </div>
+            </main>
+
+            <footer class="footer">
+                <div class="footer-content">
+                    <div class="footer-version">
+                        <span id="footer-version-text">Version: <span id="current-version">Loading...</span></span>
+                        <span id="footer-update-indicator" style="display: none;" class="update-indicator">
+                            <a href="#" id="footer-update-link" target="_blank" rel="noopener noreferrer"
+                                title="Click to download update">
+                                ⚠ Update Available: <span id="latest-version"></span>
+                            </a>
+                        </span>
+                    </div>
+                    <div class="footer-links">
+                        <a href="https://github.com/rangermix/TwitchDropsMiner" target="_blank"
+                            rel="noopener noreferrer">GitHub</a>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <script src="/static/app.js?v=__APP_VERSION__"></script>
+</body>
+
+</html>
