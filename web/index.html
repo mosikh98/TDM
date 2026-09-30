@@ -10,6 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/styles.css?v=__APP_VERSION__">
     <link rel="stylesheet" href="/static/auth.css?v=__APP_VERSION__">
     <script src="/static/auth.js?v=__APP_VERSION__"></script>
@@ -18,11 +19,15 @@
 
 <body>
     <script>
-        // Applied before first paint so switching themes doesn't flash the old one on reload.
+        // Applied before first paint so switching themes/language direction doesn't flash the old one on reload.
         (function () {
             try {
-                var saved = localStorage.getItem('tdm-theme');
-                if (saved === 'light' || saved === 'dark') document.documentElement.setAttribute('data-theme', saved);
+                var savedTheme = localStorage.getItem('tdm-theme');
+                if (savedTheme === 'light' || savedTheme === 'dark') document.documentElement.setAttribute('data-theme', savedTheme);
+                var savedDir = localStorage.getItem('tdm-dir');
+                var savedLang = localStorage.getItem('tdm-lang-code');
+                if (savedDir === 'rtl' || savedDir === 'ltr') document.documentElement.setAttribute('dir', savedDir);
+                if (savedLang) document.documentElement.setAttribute('lang', savedLang);
             } catch (e) { }
         })();
     </script>

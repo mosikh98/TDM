@@ -1157,3 +1157,58 @@ input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px;
 .toast-success { border-left-color: var(--success); }
 .toast-error { border-left-color: var(--danger); }
 .toast-warning { border-left-color: var(--warning); }
+
+/* =========================================================
+   RTL support (Persian / Arabic)
+   Flexbox direction (icon+label ordering, topbar rows, etc.)
+   mirrors automatically via the dir attribute; the rules below
+   only handle physical left/right positioning, directional
+   icons, and the few explicit LTR-only overrides that don't
+   flip on their own.
+   ========================================================= */
+html[dir="rtl"] body {
+  font-family: 'Vazirmatn', 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+html[dir="rtl"] .sidebar {
+  left: auto;
+  right: 0;
+  border-right: none;
+  border-left: 1px solid var(--border-color);
+}
+html[dir="rtl"] .workspace { margin-left: 0; margin-right: var(--sidebar-w); }
+html[dir="rtl"] .nav-item,
+html[dir="rtl"] .history-table th { text-align: right; }
+html[dir="rtl"] .topbar-actions { margin-left: 0; margin-right: auto; }
+html[dir="rtl"] .popover { right: auto; left: 14px; }
+html[dir="rtl"] .toast { border-left: none; border-right: 3px solid var(--accent); }
+html[dir="rtl"] .toast-info { border-right-color: var(--info); }
+html[dir="rtl"] .toast-success { border-right-color: var(--success); }
+html[dir="rtl"] .toast-error { border-right-color: var(--danger); }
+html[dir="rtl"] .toast-warning { border-right-color: var(--warning); }
+
+@media (max-width: 900px) {
+  html[dir="rtl"] .sidebar { transform: translateX(105%); }
+  html[dir="rtl"] .sidebar.open { transform: translateX(0); }
+  html[dir="rtl"] .popover { right: 12px; left: 12px; }
+}
+
+/* Mirror directional (arrow / chevron / external-link / logout) icons */
+html[dir="rtl"] use[href="#i-arrow-right"],
+html[dir="rtl"] use[href="#i-chevron-right"],
+html[dir="rtl"] use[href="#i-external"],
+html[dir="rtl"] use[href="#i-logout"] {
+  transform: scaleX(-1);
+  transform-origin: center;
+}
+
+/* Keep technical / numeric / log content left-to-right for readability */
+html[dir="rtl"] #console-output,
+html[dir="rtl"] .console-output,
+html[dir="rtl"] .oauth-code,
+html[dir="rtl"] code,
+html[dir="rtl"] pre {
+  direction: ltr;
+  text-align: left;
+}
+html[dir="rtl"] .notif-dot { right: auto; left: 7px; }

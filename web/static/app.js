@@ -1954,7 +1954,23 @@ async function fetchAndApplyTranslations() {
     }
 }
 
+const RTL_LANGUAGE_NAMES = new Set(['فارسی', 'العربية']);
+const RTL_LANG_CODES = { 'فارسی': 'fa', 'العربية': 'ar' };
+
+function applyTextDirection(t) {
+    const isRTL = !!(t && t.language_name && RTL_LANGUAGE_NAMES.has(t.language_name));
+    const dir = isRTL ? 'rtl' : 'ltr';
+    const langCode = isRTL ? RTL_LANG_CODES[t.language_name] : 'en';
+    document.documentElement.setAttribute('dir', dir);
+    document.documentElement.setAttribute('lang', langCode);
+    try {
+        localStorage.setItem('tdm-dir', dir);
+        localStorage.setItem('tdm-lang-code', langCode);
+    } catch (e) { }
+}
+
 function applyTranslations(t) {
+    applyTextDirection(t);
     translateHistory();
     // Update tab buttons
     const tabButtons = {
