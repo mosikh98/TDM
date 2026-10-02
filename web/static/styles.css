@@ -1106,9 +1106,12 @@ input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px;
   .workspace { margin-left: 0; }
   .menu-toggle { display: inline-grid; }
   .content { padding: 16px 14px 24px; gap: 16px; }
-  .topbar { padding: 0 14px; gap: 10px; }
+  .topbar { height: auto; min-height: var(--topbar-h); padding: 10px 14px; gap: 8px 10px; flex-wrap: wrap; }
+  .topbar-title { flex: 1 1 auto; min-width: 0; }
   .topbar-pills { display: none; }
   .topbar-title h1 { font-size: 15.5px; }
+  .topbar-actions { flex: 1 1 100%; flex-wrap: wrap; justify-content: flex-end; gap: 6px 8px; margin-left: 0; }
+  html[dir="rtl"] .topbar-actions { margin-right: 0; }
   .stat-grid { gap: 10px; }
   .stat-card { padding: 13px 14px; gap: 11px; }
   .stat-value { font-size: 16.5px; }
@@ -1187,7 +1190,7 @@ html[dir="rtl"] .toast-success { border-right-color: var(--success); }
 html[dir="rtl"] .toast-error { border-right-color: var(--danger); }
 html[dir="rtl"] .toast-warning { border-right-color: var(--warning); }
 
-@media (max-width: 900px) {
+@media (max-width: 760px) {
   html[dir="rtl"] .sidebar { transform: translateX(105%); }
   html[dir="rtl"] .sidebar.open { transform: translateX(0); }
   html[dir="rtl"] .popover { right: 12px; left: 12px; }
@@ -1212,3 +1215,10 @@ html[dir="rtl"] pre {
   text-align: left;
 }
 html[dir="rtl"] .notif-dot { right: auto; left: 7px; }
+
+/* Suppress transitions for one frame when the language direction flips,
+   so the sidebar/transform-based elements don't visibly sweep across
+   the screen while their physical left/right values invert. */
+.no-transitions, .no-transitions * {
+  transition: none !important;
+}

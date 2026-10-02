@@ -1160,16 +1160,19 @@ function updateLoginStatus(data) {
     const resetBtn = document.getElementById('oauth-reset-btn');
     if (data.user_id) {
         const userIdLabel = t.gui?.login?.user_id_label || 'User ID:';
-        statusEl.textContent = `${data.status} (${userIdLabel} ${data.user_id})`;
-        statusEl.removeAttribute('translation-key');
+        const loggedIn = t.login?.status?.logged_in || data.status;
+        statusEl.textContent = `${loggedIn} (${userIdLabel} ${data.user_id})`;
+        statusEl.setAttribute('translation-key', 'logged_in');
+        statusEl.dataset.userId = data.user_id;
         statusEl.style.color = 'var(--success-color)';
         document.getElementById('login-form').style.display = 'none';
         document.getElementById('oauth-code-display').style.display = 'none';
         if (resetBtn) resetBtn.style.display = 'none';
     } else {
-        const loggedOut = t.gui?.login?.logged_out || 'Not logged in';
+        const loggedOut = t.login?.status?.logged_out || 'Not logged in';
         statusEl.textContent = data.status || loggedOut;
         statusEl.setAttribute('translation-key', 'logged_out');
+        delete statusEl.dataset.userId;
         statusEl.style.color = 'var(--text-secondary)';
         if (resetBtn) resetBtn.style.display = 'inline-flex';
         // Check if OAuth is pending (for late-connecting clients)
@@ -1725,10 +1728,11 @@ async function confirmOAuth() {
         // Hide the OAuth form and show waiting message
         document.getElementById('oauth-code-display').style.display = 'none';
         const t = state.translations;
-        const waitingAuth = t.gui?.login?.waiting_auth || 'Waiting for authentication...';
+        const waitingAuth = t.login?.status?.waiting_auth || 'Waiting for authentication...';
         const loginStatus = document.getElementById('login-status');
         loginStatus.textContent = waitingAuth;
         loginStatus.setAttribute('translation-key', 'waiting_auth');
+        delete loginStatus.dataset.userId;
     } catch (error) {
         console.error('Failed to confirm OAuth:', error);
     }
@@ -1982,8 +1986,28 @@ function applyTextDirection(t) {
     const isRTL = !!(t && t.language_name && RTL_LANGUAGE_NAMES.has(t.language_name));
     const dir = isRTL ? 'rtl' : 'ltr';
     const langCode = isRTL ? RTL_LANG_CODES[t.language_name] : 'en';
-    document.documentElement.setAttribute('dir', dir);
-    document.documentElement.setAttribute('lang', langCode);
+    const root = document.documentElement;
+    const dirChanged = root.getAttribute('dir') !== dir;
+    if (dirChanged) {
+        // Freeze transitions for one frame so transform-based elements (the
+        // mobile sidebar drawer, popovers, etc.) don't visibly sweep across
+        // the screen while their left/right positioning inverts.
+        root.classList.add('no-transitions');
+        // Also force the mobile drawer fully closed across the flip, since an
+        // "open" drawer's resting transform (translateX(0)) is direction-agnostic
+        // but its closed-state sign flips - closing it avoids any ambiguous state.
+        const sidebar = document.getElementById('app-sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        if (sidebar) sidebar.classList.remove('open');
+        if (backdrop) backdrop.hidden = true;
+    }
+    root.setAttribute('dir', dir);
+    root.setAttribute('lang', langCode);
+    if (dirChanged) {
+        // Force layout, then restore transitions on the next frame.
+        void root.offsetHeight;
+        requestAnimationFrame(() => root.classList.remove('no-transitions'));
+    }
     try {
         localStorage.setItem('tdm-dir', dir);
         localStorage.setItem('tdm-lang-code', langCode);
@@ -1993,18 +2017,23 @@ function applyTextDirection(t) {
 function applyTranslations(t) {
     applyTextDirection(t);
     translateHistory();
-    // Update tab buttons
+    // Update tab buttons - target the .nav-label span, not the button itself,
+    // so we don't wipe out the button's icon <svg> via textContent.
     const tabButtons = {
-        'main': document.querySelector('[data-tab="main"]'),
-        'inventory': document.querySelector('[data-tab="inventory"]'),
-        'history': document.querySelector('[data-tab="history"]'),
-        'settings': document.querySelector('[data-tab="settings"]'),
-        'help': document.querySelector('[data-tab="help"]')
+        'main': document.querySelector('[data-tab="main"] .nav-label'),
+        'inventory': document.querySelector('[data-tab="inventory"] .nav-label'),
+        'history': document.querySelector('[data-tab="history"] .nav-label'),
+        'channels': document.querySelector('[data-tab="channels"] .nav-label'),
+        'rewards': document.querySelector('[data-tab="rewards"] .nav-label'),
+        'settings': document.querySelector('[data-tab="settings"] .nav-label'),
+        'help': document.querySelector('[data-tab="help"] .nav-label')
     };
 
     if (tabButtons.main && t.gui?.tabs) tabButtons.main.textContent = t.gui.tabs.main;
     if (tabButtons.inventory && t.gui?.tabs) tabButtons.inventory.textContent = t.gui.tabs.inventory;
     if (tabButtons.history && t.gui?.tabs) tabButtons.history.textContent = t.gui.tabs.history;
+    if (tabButtons.channels && t.gui?.tabs) tabButtons.channels.textContent = t.gui.tabs.channels;
+    if (tabButtons.rewards && t.gui?.tabs) tabButtons.rewards.textContent = t.gui.tabs.rewards;
     if (tabButtons.settings && t.gui?.tabs) tabButtons.settings.textContent = t.gui.tabs.settings;
     if (tabButtons.help && t.gui?.tabs) tabButtons.help.textContent = t.gui.tabs.help;
 
@@ -2015,7 +2044,18 @@ function applyTranslations(t) {
         if (loginHeader) loginHeader.textContent = t.gui.login.name;
 
         const loginStatus = document.getElementById('login-status');
-        if (loginStatus?.hasAttribute('translation-key')) loginStatus.textContent = t.login?.status?.[loginStatus.getAttribute('translation-key')];
+        if (loginStatus?.hasAttribute('translation-key')) {
+            const key = loginStatus.getAttribute('translation-key');
+            const text = t.login?.status?.[key];
+            if (text) {
+                if (key === 'logged_in' && loginStatus.dataset.userId) {
+                    const userIdLabel = t.gui?.login?.user_id_label || 'User ID:';
+                    loginStatus.textContent = `${text} (${userIdLabel} ${loginStatus.dataset.userId})`;
+                } else {
+                    loginStatus.textContent = text;
+                }
+            }
+        }
 
         // Update login form placeholders
         const usernameInput = document.getElementById('username');

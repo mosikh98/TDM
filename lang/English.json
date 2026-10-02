@@ -75,6 +75,8 @@
         "tabs": {
             "main": "Main",
             "inventory": "Inventory",
+            "channels": "Channels",
+            "rewards": "Inventory",
             "settings": "Settings",
             "help": "Help",
             "history": "History"
@@ -82,6 +84,7 @@
         "login": {
             "name": "Login Form",
             "labels": "Status:\nUser ID:",
+            "user_id_label": "User ID:",
             "request": "Please log in to continue.",
             "username": "Username",
             "password": "Password",
