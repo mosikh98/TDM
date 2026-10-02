@@ -1111,7 +1111,6 @@ input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px;
   .topbar-pills { display: none; }
   .topbar-title h1 { font-size: 15.5px; }
   .topbar-actions { flex: 1 1 100%; flex-wrap: wrap; justify-content: flex-end; gap: 6px 8px; margin-left: 0; }
-  html[dir="rtl"] .topbar-actions { margin-right: 0; }
   .stat-grid { gap: 10px; }
   .stat-card { padding: 13px 14px; gap: 11px; }
   .stat-value { font-size: 16.5px; }
@@ -1221,4 +1220,13 @@ html[dir="rtl"] .notif-dot { right: auto; left: 7px; }
    the screen while their physical left/right values invert. */
 .no-transitions, .no-transitions * {
   transition: none !important;
+}
+
+/* Mobile-width RTL overrides - kept after the general RTL block above (and
+   after the base @media(max-width:760px) block) so they reliably win the
+   cascade: on mobile the sidebar is an off-canvas drawer, not a permanent
+   column, so it must not reserve any margin on either side. */
+@media (max-width: 760px) {
+  html[dir="rtl"] .workspace { margin-right: 0; }
+  html[dir="rtl"] .topbar-actions { margin-right: 0; }
 }
