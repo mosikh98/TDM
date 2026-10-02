@@ -366,6 +366,16 @@ async def confirm_oauth():
     return {"success": True}
 
 
+@app.post("/api/oauth/reset")
+async def reset_oauth():
+    """Cancel the in-progress OAuth device-code flow and request a fresh code."""
+    if not gui_manager:
+        raise HTTPException(status_code=503, detail="GUI not initialized")
+
+    gui_manager.login.request_reset()
+    return {"success": True}
+
+
 @app.post("/api/reload")
 async def trigger_reload():
     """Fetch fresh campaign and inventory data."""

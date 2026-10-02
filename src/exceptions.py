@@ -44,6 +44,18 @@ class RequestInvalid(RequestException):
         super().__init__("Request became invalid during its retry loop")
 
 
+class OAuthResetRequested(MinerException):
+    """
+    Raised when the user requests a reset of the in-progress OAuth device-code flow
+    from the web UI, so that a brand new device code can be requested immediately.
+
+    Intended for internal use only.
+    """
+
+    def __init__(self):
+        super().__init__("OAuth device-code flow was reset by the user")
+
+
 class WebsocketClosed(RequestException):
     """
     Raised when the websocket connection has been closed.

@@ -101,7 +101,7 @@ class _AuthState:
             try:
                 from datetime import datetime, timedelta, timezone
 
-                from src.exceptions import RequestInvalid
+                from src.exceptions import OAuthResetRequested, RequestInvalid
 
                 now = datetime.now(timezone.utc)
                 async with self._twitch.request(
@@ -131,7 +131,7 @@ class _AuthState:
                 }
                 while True:
                     # sleep first, not like the user is gonna enter the code *that* fast
-                    await asyncio.sleep(interval)
+                    await login_form.wait_interval_or_reset(interval)
                     async with self._twitch.request(
                         "POST",
                         "https://id.twitch.tv/oauth2/token",
@@ -151,8 +151,9 @@ class _AuthState:
                         # }
                         self.access_token = cast(str, response_json["access_token"])
                         return self.access_token
-            except RequestInvalid:
-                # the device_code has expired, request a new code
+            except (RequestInvalid, OAuthResetRequested):
+                # the device_code has expired, or the user requested a reset -
+                # either way, request a new code
                 continue
 
     def headers(self, *, user_agent: str = "", gql: bool = False) -> JsonType:

@@ -475,6 +475,16 @@
                                 <button id="oauth-confirm" type="button" class="btn btn-primary">I've entered the
                                     code</button>
                             </div>
+                            <button id="oauth-reset-btn" type="button" class="btn btn-ghost btn-sm"
+                                style="display: none; margin-top: 10px;">
+                                <svg class="icon icon-xs">
+                                    <use href="#i-refresh"></use>
+                                </svg> Reset Connection
+                            </button>
+                            <p class="help-text" id="oauth-reset-help">If you have the Twitch app installed, it can
+                                sometimes interfere with this login flow on certain phones. If login keeps failing,
+                                use the Reset Connection button, uninstall the Twitch app, then try connecting again
+                                from this site. You can reinstall the Twitch app afterwards.</p>
                         </section>
 
                         <!-- Log output -->

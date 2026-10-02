@@ -90,7 +90,11 @@ async def test_device_login_migrates_and_restores_sessions(tmp_path, monkeypatch
     monkeypatch.setattr("src.core.client.DATA_DIR", tmp_path)
     client = Twitch(MagicMock())
     client.gui = SimpleNamespace(
-        login=SimpleNamespace(update=MagicMock(), ask_enter_code=AsyncMock())
+        login=SimpleNamespace(
+            update=MagicMock(),
+            ask_enter_code=AsyncMock(),
+            wait_interval_or_reset=AsyncMock(),
+        )
     )
     jar = aiohttp.CookieJar()
     if saved_session.startswith("android"):

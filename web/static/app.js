@@ -1141,6 +1141,8 @@ function renderInventory() {
 function showLoginForm() {
     document.getElementById('login-form').style.display = 'block';
     document.getElementById('oauth-code-display').style.display = 'none';
+    const resetBtn = document.getElementById('oauth-reset-btn');
+    if (resetBtn) resetBtn.style.display = 'inline-flex';
 }
 
 function showOAuthCode(url, code) {
@@ -1148,11 +1150,14 @@ function showOAuthCode(url, code) {
     document.getElementById('oauth-code-display').style.display = 'block';
     document.getElementById('oauth-url').href = url;
     document.getElementById('oauth-code').textContent = code;
+    const resetBtn = document.getElementById('oauth-reset-btn');
+    if (resetBtn) resetBtn.style.display = 'inline-flex';
 }
 
 function updateLoginStatus(data) {
     const statusEl = document.getElementById('login-status');
     const t = state.translations;
+    const resetBtn = document.getElementById('oauth-reset-btn');
     if (data.user_id) {
         const userIdLabel = t.gui?.login?.user_id_label || 'User ID:';
         statusEl.textContent = `${data.status} (${userIdLabel} ${data.user_id})`;
@@ -1160,15 +1165,31 @@ function updateLoginStatus(data) {
         statusEl.style.color = 'var(--success-color)';
         document.getElementById('login-form').style.display = 'none';
         document.getElementById('oauth-code-display').style.display = 'none';
+        if (resetBtn) resetBtn.style.display = 'none';
     } else {
         const loggedOut = t.gui?.login?.logged_out || 'Not logged in';
         statusEl.textContent = data.status || loggedOut;
         statusEl.setAttribute('translation-key', 'logged_out');
         statusEl.style.color = 'var(--text-secondary)';
+        if (resetBtn) resetBtn.style.display = 'inline-flex';
         // Check if OAuth is pending (for late-connecting clients)
         if (data.oauth_pending) {
             showOAuthCode(data.oauth_pending.url, data.oauth_pending.code);
         }
+    }
+}
+
+async function resetOAuthConnection() {
+    const resetBtn = document.getElementById('oauth-reset-btn');
+    if (resetBtn) resetBtn.disabled = true;
+    try {
+        await fetch('/api/oauth/reset', { method: 'POST' });
+        const t = state.translations;
+        showToast(t.gui?.login?.reset_success || 'Connection reset. Requesting a new code...', 'info');
+    } catch (error) {
+        console.error('Failed to reset OAuth connection:', error);
+    } finally {
+        if (resetBtn) resetBtn.disabled = false;
     }
 }
 
@@ -2025,6 +2046,16 @@ function applyTranslations(t) {
             const oauthConfirmBtn = document.getElementById('oauth-confirm');
             if (oauthConfirmBtn) oauthConfirmBtn.textContent = t.gui.login.oauth_confirm;
         }
+
+        const resetBtn = document.getElementById('oauth-reset-btn');
+        if (resetBtn) {
+            const resetLabel = t.gui?.login?.reset_button || 'Reset Connection';
+            const svg = resetBtn.querySelector('svg');
+            resetBtn.textContent = ' ' + resetLabel;
+            if (svg) resetBtn.prepend(svg);
+        }
+        const resetHelp = document.getElementById('oauth-reset-help');
+        if (resetHelp) resetHelp.textContent = t.gui?.login?.reset_help || resetHelp.textContent;
     }
 
     // Update Progress section
@@ -2408,6 +2439,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Login form
     document.getElementById('login-button').addEventListener('click', submitLogin);
     document.getElementById('oauth-confirm').addEventListener('click', confirmOAuth);
+    const oauthResetBtn = document.getElementById('oauth-reset-btn');
+    if (oauthResetBtn) oauthResetBtn.addEventListener('click', resetOAuthConnection);
 
     // Settings - auto-save on change
     document.getElementById('dark-mode').addEventListener('change', (e) => {
