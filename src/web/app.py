@@ -30,10 +30,34 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("TwitchDrops")
 
+
+def _resolve_public_base_url() -> str:
+    """Determine the dashboard's public base URL without requiring manual setup.
+
+    Priority:
+    1. The ``PUBLIC_BASE_URL`` environment variable, if explicitly set (even to
+       an empty string, which forces the request-derived fallback below) -
+       lets anyone override this for a custom domain or local development.
+    2. Railway automatically injects ``RAILWAY_PUBLIC_DOMAIN`` into every
+       deployment's environment with the service's actual public domain
+       (the default ``*.up.railway.app`` one, or a custom domain if attached) -
+       no manual configuration needed, and it stays correct even if the
+       domain changes later.
+    3. An empty string, which makes DashboardOrigin derive the origin from
+       each incoming request's Host header instead of a fixed value - the
+       original behavior, used for non-Railway / local deployments.
+    """
+    if (explicit := os.environ.get("PUBLIC_BASE_URL")) is not None:
+        return explicit
+    if railway_domain := os.environ.get("RAILWAY_PUBLIC_DOMAIN"):
+        return f"https://{railway_domain}"
+    return ""
+
+
 # Create FastAPI app
 app = FastAPI(title="Twitch Drops Miner Web", version=__version__)
 
-web_auth = WebAuth(DATA_DIR / "web_auth.json", public_base_url=os.environ.get("PUBLIC_BASE_URL", ""))
+web_auth = WebAuth(DATA_DIR / "web_auth.json", public_base_url=_resolve_public_base_url())
 sio = AuthSocketServer(web_auth)
 app.include_router(AuthAPI(web_auth, sio).router)
 app.add_middleware(AuthMiddleware, auth=web_auth)
