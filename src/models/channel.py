@@ -305,8 +305,16 @@ class Channel:
 
         For mobile view, spade_url is available immediately from the page, skipping step #2.
         """
-        SETTINGS_PATTERN: str = r'src="(https://[\w.]+/config/settings\.[0-9a-f]{32}\.js)"'
-        SPADE_PATTERN: str = r'"beacon_?url": ?"(https://[^"]+)"'
+        # NOTE: The pattern must match "spade_url" only. Twitch's settings.js contains both
+        # "beacon_url" (https://beacon.twitch.tv/track - a plain analytics beacon that answers
+        # 204 to everything and credits nothing) and "spade_url"
+        # (https://spade.twitch.tv/track - the minute-watched endpoint). The old
+        # "beacon_?url" pattern matched the analytics one first, so every watch signal
+        # went into a black hole while the app reported success.
+        # Upstream TwitchDropsMiner made this same fix ("Narrow the spade pattern to
+        # 'spade_url' only", 2026-03-28).
+        SETTINGS_PATTERN: str = r'src="(https://[\w.\-]+/config/settings\.[0-9a-f]{32}\.js)"'
+        SPADE_PATTERN: str = r'"spade_?url": ?"(https://[.\w\-/]+)"'
         async with self._twitch.request("GET", self.url) as response1:
             streamer_html: str = await response1.text(encoding="utf8")
         match = re.search(SPADE_PATTERN, streamer_html, re.I)
@@ -427,7 +435,7 @@ class Channel:
         if needs_display:
             self.display()
 
-    # NOTE: This is currently unused.
+    # Primary watch method: an HLS playlist HEAD request.
     async def _send_watch_playlist(self) -> bool:
         """
         This performs a HEAD request on the stream's current playlist,
@@ -482,15 +490,31 @@ class Channel:
 
     async def send_watch(self) -> bool:
         """
-        Send the Spade "minute-watched" event that makes Twitch count watch time.
+        Send a watch signal for the current stream.
 
-        Returns True when Twitch accepted it (HTTP 204). On failure the reason is
+        Primary method: a HEAD request on the newest HLS playlist chunk. Twitch is
+        currently crediting this one - upstream TwitchDropsMiner switched its mining
+        method to it on 2026-10-09 ("Change the mining method to playlist HEAD
+        requests"), after the Spade POST stopped being credited again.
+
+        Fallback: the classic Spade "minute-watched" event, posted to the
+        ``spade_url`` endpoint extracted from the streamer page.
+
+        Returns True when Twitch accepted either method. On failure the reason is
         stored in ``last_watch_error`` so callers can show it to the user.
         """
         self.last_watch_error = None
         if self._stream is None:
             self.last_watch_error = "the channel has no live stream"
             return False
+        # 1) playlist HEAD request (the method Twitch currently credits)
+        try:
+            if await self._send_watch_playlist():
+                return True
+            playlist_error = "no stream chunk answered with HTTP 200"
+        except (MinerException, RequestException, aiohttp.InvalidURL, ValueError) as exc:
+            playlist_error = f"playlist: {type(exc).__name__}: {exc}"
+        # 2) Spade "minute-watched" fallback
         try:
             if self._spade_url is None:
                 self._spade_url = await self.get_spade_url()
@@ -499,8 +523,11 @@ class Channel:
             ) as response:
                 if response.status == 204:
                     return True
-                self.last_watch_error = f"Twitch answered HTTP {response.status} instead of 204"
+                self.last_watch_error = (
+                    f"{playlist_error}; spade: "
+                    f"Twitch answered HTTP {response.status} instead of 204"
+                )
                 return False
         except (MinerException, RequestException) as exc:
-            self.last_watch_error = f"{type(exc).__name__}: {exc}"
+            self.last_watch_error = f"{playlist_error}; spade: {type(exc).__name__}: {exc}"
             return False
