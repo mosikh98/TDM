@@ -62,7 +62,10 @@ GITHUB_REPO_URL = f"https://github.com/{GITHUB_REPO}"
 PING_INTERVAL = timedelta(minutes=3)
 PING_TIMEOUT = timedelta(seconds=10)
 ONLINE_DELAY = timedelta(seconds=120)
-WATCH_INTERVAL = timedelta(seconds=59)
+# NOTE: 20s, matching the playlist-HEAD mining method (upstream lowered it from 59s
+# in the same commit that switched to playlist HEAD requests, 2026-10-09). Each loop
+# cycle covers ~30s of stream chunks, so this keeps up with real time.
+WATCH_INTERVAL = timedelta(seconds=20)
 
 
 class State(Enum):
