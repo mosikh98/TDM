@@ -464,19 +464,43 @@ async def confirm_oauth():
 async def reset_oauth():
     """Cancel the in-progress OAuth device-code flow and request a fresh code.
 
+    When the app is already logged in, this also invalidates the current Twitch
+    session (access token + cookies) and starts a NEW device-code flow, so the
+    dashboard shows a fresh code. Previously a fresh code could only be obtained
+    by wiping the Railway volume, because the reset button only worked while a
+    login flow was already running.
+
     Rate-limited server-side (see LoginFormManager.request_reset) regardless of
     how many browser tabs or clients call this.
     """
     if not gui_manager:
         raise HTTPException(status_code=503, detail="GUI not initialized")
 
-    retry_after = gui_manager.login.request_reset()
+    login_form = gui_manager.login
+    retry_after = login_form.request_reset()
     if retry_after > 0:
         return JSONResponse(
             status_code=429,
             content={"success": False, "retry_after": retry_after},
             headers={"Retry-After": str(int(retry_after) + 1)},
         )
+
+    if login_form._user_id is not None and twitch_client is not None:
+        # logged in: drop the Twitch session so the next validate() asks for a new code
+        from src.config import COOKIES_PATH
+        from src.config.operations import GQL_OPERATIONS
+        from src.i18n import _
+
+        auth_state = await twitch_client.get_auth()
+        auth_state.invalidate()
+        session = await twitch_client.get_session()
+        session.cookie_jar.clear()
+        COOKIES_PATH.unlink(missing_ok=True)
+        login_form.update(_.t["login"]["status"]["logged_out"], None)
+        # kick off a GQL request in the background: it triggers the device-code
+        # flow right away instead of waiting for the next scheduled refresh
+        asyncio.create_task(twitch_client.gql_request(GQL_OPERATIONS["Inventory"]))
+
     return {"success": True}
 
 

@@ -1236,7 +1236,10 @@ function updateLoginStatus(data) {
         statusEl.style.color = 'var(--success-color)';
         document.getElementById('login-form').style.display = 'none';
         document.getElementById('oauth-code-display').style.display = 'none';
-        if (resetBtn) resetBtn.style.display = 'none';
+        // Reset Connection stays visible while logged in: it now invalidates the
+        // Twitch session and starts a fresh device-code flow (switch account /
+        // recover without wiping the Railway volume).
+        if (resetBtn) resetBtn.style.display = 'inline-flex';
     } else {
         const loggedOut = t.login?.status?.logged_out || 'Not logged in';
         statusEl.textContent = data.status || loggedOut;
