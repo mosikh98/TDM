@@ -1,0 +1,91 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import TypedDict
+
+from yarl import URL
+
+from src.config import DEFAULT_LANG, SETTINGS_PATH
+from src.utils import DropIgnorePolicy, json_load, json_save
+
+
+class InventoryFilters(TypedDict):
+    game_name_search: list[str]
+    show_active: bool
+    show_benefit_badge: bool
+    show_benefit_emote: bool
+    show_benefit_item: bool
+    show_benefit_other: bool
+    show_expired: bool
+    show_finished: bool
+    show_only_not_linked: bool
+    show_upcoming: bool
+
+
+default_settings = {
+    "connection_quality": 1,
+    "dark_mode": False,
+    "drop_name_blacklist": [],
+    "games_to_watch": [],
+    "language": DEFAULT_LANG,
+    "inventory_filters": {
+        "game_name_search": [],
+        "show_active": False,
+        "show_benefit_badge": True,
+        "show_benefit_emote": True,
+        "show_benefit_item": True,
+        "show_benefit_other": True,
+        "show_expired": False,
+        "show_finished": False,
+        "show_only_not_linked": False,
+        "show_upcoming": True,
+    },
+    "inventory_list_view": False,
+    "minimum_refresh_interval_minutes": 30,
+    "mining_benefits": {
+        "BADGE": True,
+        "DIRECT_ENTITLEMENT": True,
+        "EMOTE": True,
+        "UNKNOWN": True,
+    },
+    "proxy": "",
+    "telegram_bot_token": "",
+    "telegram_chat_id": "",
+}
+
+
+@dataclass
+class Settings:
+    connection_quality: int
+    dark_mode: bool
+    drop_name_blacklist: list[str]
+    games_to_watch: list[str]
+    language: str
+    inventory_filters: InventoryFilters
+    inventory_list_view: bool
+    minimum_refresh_interval_minutes: int
+    mining_benefits: dict[str, bool]
+    proxy: str
+    telegram_bot_token: str
+    telegram_chat_id: str
+
+    def __init__(self):
+        self.load()
+
+    def load(self):
+        # TODO: remvoe customized serde in the future
+        settings = json_load(SETTINGS_PATH, default_settings, merge=True)
+        for key, value in settings.items():
+            if value is URL:
+                setattr(self, key, str(value))
+            else:
+                setattr(self, key, value)
+        self.drop_name_blacklist = DropIgnorePolicy.normalize_keywords(
+            self.drop_name_blacklist
+        )
+
+    def save(self) -> None:
+        self.drop_name_blacklist = DropIgnorePolicy.normalize_keywords(
+            self.drop_name_blacklist
+        )
+        json_save(SETTINGS_PATH, vars(self), sort=True)

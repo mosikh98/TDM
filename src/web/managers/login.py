@@ -1,0 +1,188 @@
+"""Login form manager for handling Twitch authentication."""
+
+from __future__ import annotations
+
+import asyncio
+import time
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
+
+from src.exceptions import OAuthResetRequested
+from src.i18n import _
+
+
+# Minimum time between accepted "Reset Connection" requests. Prevents a stuck
+# button, a double click, or multiple open tabs from hammering Twitch's device
+# code endpoint with back-to-back requests.
+RESET_COOLDOWN_SECONDS = 10.0
+
+
+if TYPE_CHECKING:
+    from src.web.gui_manager import WebGUIManager
+    from src.web.managers.broadcaster import WebSocketBroadcaster
+
+
+@dataclass
+class LoginData:
+    """Container for login credentials submitted by the user."""
+
+    username: str
+    password: str
+    token: str
+
+
+class LoginFormManager:
+    """Manages login form and OAuth authentication flow in the web interface.
+
+    Handles both traditional username/password login and OAuth device code flow,
+    coordinating between the web client and the Twitch authentication system.
+    """
+
+    def __init__(self, broadcaster: WebSocketBroadcaster, manager: WebGUIManager):
+        self._broadcaster = broadcaster
+        self._manager = manager
+        self._login_event = asyncio.Event()
+        self._reset_event = asyncio.Event()
+        self._last_reset_at: float = 0.0
+        self._login_data: LoginData | None = None
+        self._status = _.t["login"]["status"]["logged_out"]
+        self._user_id: int | None = None
+        self._oauth_pending: dict[str, str] | None = (
+            None  # Store OAuth code for late-connecting clients
+        )
+
+    def clear(self, login: bool = False, password: bool = False, token: bool = False):
+        """Clear login form fields on the client side.
+
+        Args:
+            login: Clear the login/username field
+            password: Clear the password field
+            token: Clear the 2FA token field
+        """
+        asyncio.create_task(
+            self._broadcaster.emit(
+                "login_clear", {"login": login, "password": password, "token": token}
+            )
+        )
+
+    def update(self, status: str, user_id: int | None):
+        """Update login status display.
+
+        Args:
+            status: Status message to display (e.g., "Logged in as...", "Login required")
+            user_id: Twitch user ID if logged in, None otherwise
+        """
+        self._status = status
+        self._user_id = user_id
+        asyncio.create_task(
+            self._broadcaster.emit("login_status", {"status": status, "user_id": user_id})
+        )
+
+    async def ask_enter_code(self, page_url, user_code: str):
+        """Request OAuth device code entry from the user.
+
+        Displays the activation URL and code to the user, waiting for them
+        to complete the OAuth flow on Twitch's website.
+
+        Args:
+            page_url: URL where user should enter the code (e.g., twitch.tv/activate)
+            user_code: The device code to enter
+
+        Raises:
+            OAuthResetRequested: If the user clicked "Reset Connection" before
+                confirming the code, signalling that a fresh code should be requested.
+        """
+        self.update(_.t["login"]["status"]["required"], None)
+        self._login_event.clear()
+        self._reset_event.clear()
+        # Store OAuth code for late-connecting clients
+        self._oauth_pending = {"url": str(page_url), "code": user_code}
+        await self._broadcaster.emit("oauth_code_required", self._oauth_pending)
+        # Wait for the user to either confirm code entry, or request a reset
+        login_task = asyncio.ensure_future(self._login_event.wait())
+        reset_task = asyncio.ensure_future(self._reset_event.wait())
+        try:
+            done, pending = await asyncio.wait(
+                {login_task, reset_task}, return_when=asyncio.FIRST_COMPLETED
+            )
+        finally:
+            for task in (login_task, reset_task):
+                if not task.done():
+                    task.cancel()
+        # Clear OAuth state after confirmation or reset
+        self._oauth_pending = None
+        if reset_task in done:
+            self._reset_event.clear()
+            raise OAuthResetRequested()
+
+    async def wait_interval_or_reset(self, interval: float) -> None:
+        """Sleep for `interval` seconds while polling for OAuth authorization.
+
+        Returns early if the user requests a reset from the web UI.
+
+        Args:
+            interval: Number of seconds to sleep, as dictated by Twitch's device
+                code response.
+
+        Raises:
+            OAuthResetRequested: If the user clicked "Reset Connection" during the wait.
+        """
+        sleep_task = asyncio.ensure_future(asyncio.sleep(interval))
+        reset_task = asyncio.ensure_future(self._reset_event.wait())
+        try:
+            done, pending = await asyncio.wait(
+                {sleep_task, reset_task}, return_when=asyncio.FIRST_COMPLETED
+            )
+        finally:
+            for task in (sleep_task, reset_task):
+                if not task.done():
+                    task.cancel()
+        if reset_task in done:
+            self._reset_event.clear()
+            raise OAuthResetRequested()
+
+    def request_reset(self) -> float:
+        """Cancel any in-progress OAuth device-code flow and request a fresh code.
+
+        Called when the user clicks "Reset Connection" in the web UI. Wakes up
+        whichever wait is currently active (code-entry wait or token-poll wait),
+        causing the login flow to immediately request a brand new device code.
+
+        Rate-limited to at most once every RESET_COOLDOWN_SECONDS, so a stuck
+        button, a double click, or several open tabs can't spam Twitch's device
+        code endpoint with back-to-back requests.
+
+        Returns:
+            0.0 if the reset was accepted. Otherwise, the number of seconds the
+            caller should wait before trying again.
+        """
+        now = time.monotonic()
+        elapsed = now - self._last_reset_at
+        if elapsed < RESET_COOLDOWN_SECONDS:
+            return RESET_COOLDOWN_SECONDS - elapsed
+        self._last_reset_at = now
+        self._reset_event.set()
+        return 0.0
+
+    def submit_login(self, username: str, password: str, token: str = ""):
+        """Submit login credentials (called by webapp when user submits form).
+
+        Args:
+            username: Twitch username or email
+            password: Account password
+            token: Optional 2FA token
+        """
+        self._login_data = LoginData(username, password, token)
+        self._login_event.set()
+
+    def get_status(self) -> dict[str, Any]:
+        """Get current login status for client synchronization.
+
+        Returns:
+            Dictionary with status, user_id, and optional oauth_pending data
+        """
+        result: dict[str, Any] = {"status": self._status, "user_id": self._user_id}
+        # Include OAuth code if pending
+        if self._oauth_pending:
+            result["oauth_pending"] = self._oauth_pending
+        return result

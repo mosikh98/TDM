@@ -1,0 +1,13 @@
+{
+  "name": "twitch-drops-miner-web",
+  "private": true,
+  "description": "Lint tooling for the dashboard's JavaScript. The application itself is Python (see pyproject.toml).",
+  "scripts": {
+    "lint": "eslint web/static",
+    "lint:fix": "eslint web/static --fix"
+  },
+  "devDependencies": {
+    "@sabzidev/eslint-rules": "^1.0.9",
+    "eslint": "^9.22.0"
+  }
+}
