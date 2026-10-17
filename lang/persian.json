@@ -136,7 +136,9 @@
             "active_badge": "در حال استخراج فعال",
             "no_drop_sub": "به‌محض در دسترس‌بودن یک کمپین، ماینر شروع می‌کند.",
             "mining_state": "در حال استخراج",
-            "claiming_state": "در حال دریافت"
+            "claiming_state": "در حال دریافت",
+            "waiting_channel": "در انتظار کانال زنده",
+            "waiting_channel_sub": "کمپین فعال است ({campaigns} در جریان)، اما الان هیچ کانال واجد شرایطی آنلاین نیست — کانال‌های آنلاین: {live_channels}."
         },
         "channels": {
             "name": "کانال‌ها",

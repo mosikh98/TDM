@@ -330,6 +330,12 @@ class TimedDrop(BaseDrop):
 
     def _on_state_changed(self) -> None:
         self._twitch.gui.inv.update_drop(self)
+        # Keep the web dashboard's "Active Mining" panel in sync: since the
+        # websocket progress updates work again, display() is no longer called
+        # for every minute, which left the panel stale while mining continued.
+        refresh = getattr(self._twitch.gui, "refresh_mining_panel", None)
+        if callable(refresh):
+            refresh(self)
 
     def _update_real_minutes(self, delta: int) -> None:
         if delta == 0 or self.real_current_minutes + delta < 0 or not self.can_earn():

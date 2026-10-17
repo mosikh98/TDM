@@ -73,11 +73,15 @@ class ChannelListManager:
         """
         self._watching_id = channel.id
         asyncio.create_task(self._broadcaster.emit("channel_watching", {"id": channel.id}))
+        if self._gui_manager is not None:
+            self._gui_manager.set_mining_state()
 
     def clear_watching(self):
         """Clear the currently watched channel indicator."""
         self._watching_id = None
         asyncio.create_task(self._broadcaster.emit("channel_watching_clear", {}))
+        if self._gui_manager is not None:
+            self._gui_manager.set_mining_state()
 
     def get_selection(self) -> Channel | None:
         """Get user's channel selection from web GUI.

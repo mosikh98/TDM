@@ -136,7 +136,9 @@
             "active_badge": "ACTIVE MINING",
             "no_drop_sub": "The miner will start as soon as a campaign is available.",
             "mining_state": "MINING",
-            "claiming_state": "CLAIMING"
+            "claiming_state": "CLAIMING",
+            "waiting_channel": "Waiting for a live channel",
+            "waiting_channel_sub": "A campaign is active ({campaigns} in progress), but no eligible channel is live right now - live channels: {live_channels}."
         },
         "channels": {
             "name": "Channels",

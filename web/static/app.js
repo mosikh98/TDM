@@ -231,8 +231,11 @@ socket.on('initial_state', (data) => {
     // Restore current drop progress if it exists
     if (data.current_drop) {
         updateDropProgress(data.current_drop);
-    } else {
+    } else if (!data.miner_status) {
         clearDropProgress();
+    }
+    if (data.miner_status) {
+        updateMinerStatus(data.miner_status);
     }
 
     if (data.wanted_items) {
@@ -287,6 +290,10 @@ socket.on('drop_progress', (data) => {
 
 socket.on('drop_progress_stop', () => {
     clearDropProgress();
+});
+
+socket.on('miner_status', (data) => {
+    updateMinerStatus(data);
 });
 
 socket.on('campaign_add', (data) => {
@@ -663,6 +670,41 @@ function clearDropProgress() {
 
     document.getElementById('no-drop-message').style.display = 'block';
     document.getElementById('drop-info').style.display = 'none';
+    // re-apply the honest empty state (waiting for a live channel vs. truly idle)
+    applyEmptyStateText();
+}
+
+// The empty state of the Active Mining panel tells the truth about *why* nothing
+// is being mined: "waiting" = campaigns are active but no eligible channel is
+// live, "idle" = no campaigns at all. Text comes from the i18n progress strings.
+function progressStrings() {
+    const gui = state.translations && state.translations.gui;
+    return (gui && gui.progress) || {};
+}
+
+function updateMinerStatus(data) {
+    state.minerStatus = data;
+    if (data && data.state === 'mining') return; // drop_progress will fill the panel
+    if (state.currentDrop) return;              // a drop is already on the panel
+    applyEmptyStateText();
+}
+
+function applyEmptyStateText() {
+    const titleEl = document.getElementById('no-drop-message-title');
+    const subEl = document.getElementById('no-drop-message-sub');
+    if (!titleEl || !subEl) return;
+    const p = progressStrings();
+    const s = state.minerStatus;
+    if (s && s.state === 'waiting') {
+        titleEl.textContent = p.waiting_channel || 'Waiting for a live channel';
+        subEl.textContent = (p.waiting_channel_sub ||
+            'A campaign is active ({campaigns} in progress), but no eligible channel is live right now - live channels: {live_channels}.')
+            .replace('{campaigns}', s.campaigns)
+            .replace('{live_channels}', s.live_channels);
+    } else {
+        titleEl.textContent = p.no_drop || 'No active drop';
+        subEl.textContent = p.no_drop_sub || 'The miner will start as soon as a campaign is available.';
+    }
 }
 
 function addCampaign(campaignData) {
@@ -2180,6 +2222,8 @@ function applyTranslations(t) {
         if (noDropMsgTitle) noDropMsgTitle.textContent = t.gui.progress.no_drop;
         const noDropMsgSub = document.getElementById('no-drop-message-sub');
         if (noDropMsgSub) noDropMsgSub.textContent = t.gui.progress.no_drop_sub || noDropMsgSub.textContent;
+        // keep the honest empty state (waiting/idle) in the newly loaded language
+        if (typeof applyEmptyStateText === 'function') applyEmptyStateText();
 
         const miningLiveText = document.getElementById('mining-live-text');
         if (miningLiveText) miningLiveText.textContent = t.gui.progress.active_badge || miningLiveText.textContent;

@@ -60,6 +60,7 @@ class WatchService:
         self._watch_failures: int = 0
         self._watch_failure_channel_id: int | None = None
         self._last_estimate_warning: float = 0.0
+        self._status_tick: int = 0
 
     def can_watch(self, channel: Channel) -> bool:
         """
@@ -244,6 +245,14 @@ class WatchService:
             if not succeeded:
                 logger.log(CALL, f"Watch requested failed for channel: {channel.name}")
             self._report_watch_result(channel, succeeded)
+
+            # refresh the dashboard's mining status every ~5th cycle (~2 min), so the
+            # "waiting for a live channel" text reflects the live channel count
+            self._status_tick += 1
+            if self._status_tick % 5 == 0:
+                set_state = getattr(self._twitch.gui, "set_mining_state", None)
+                if callable(set_state):
+                    set_state()
 
             # wait ~15 seconds for a progress update
             await asyncio.sleep(15 - min(time() - last_sent, 15))

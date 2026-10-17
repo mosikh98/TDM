@@ -116,6 +116,46 @@ class WebGUIManager:
         """Clear the drop progress display."""
         self.progress.stop_timer()
 
+    def refresh_mining_panel(self, drop: TimedDrop) -> None:
+        """Re-emit the "Active Mining" payload when a drop's state changes.
+
+        Only for the drop the panel currently shows - other drops are plain
+        inventory updates. This is what keeps the panel in sync during a
+        websocket-driven mining session, where display() is no longer called
+        for every minute.
+        """
+        current = self.progress.get_current_drop()
+        if current is None or current["drop_id"] != drop.id:
+            return
+        self.progress.update(drop, drop.remaining_minutes * 60)
+
+    def mining_status(self) -> dict:
+        """Honest state behind the "Active Mining" panel.
+
+        "mining" = a channel is being watched, "waiting" = campaigns are active
+        but nothing can be mined, "idle" = no campaigns at all.
+        """
+        twitch = self._twitch
+        watching = twitch.watching_channel.get_with_default(None)
+        campaigns = len(twitch.inventory)
+        live_channels = sum(1 for ch in twitch.channels.values() if ch.online)
+        if watching is not None:
+            state = "mining"
+        elif campaigns:
+            state = "waiting"
+        else:
+            state = "idle"
+        return {
+            "state": state,
+            "watching_channel": watching.name if watching is not None else None,
+            "campaigns": campaigns,
+            "live_channels": live_channels,
+        }
+
+    def set_mining_state(self) -> None:
+        """Broadcast the mining status so the dashboard never lies about why nothing is mined."""
+        asyncio.create_task(self._broadcaster.emit("miner_status", self.mining_status()))
+
     def grab_attention(self, *, sound: bool = True):
         """Get user's attention via notification.
 
