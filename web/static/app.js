@@ -211,7 +211,7 @@ socket.on('initial_state', (data) => {
 
     // Batch update console logs
     if (data.console) {
-        const consoleEl = document.getElementById('console-output');
+        const consoleEl = consoleSink();
         const fragment = document.createDocumentFragment();
         data.console.forEach(line => {
             const div = document.createElement('div');
@@ -387,12 +387,31 @@ function updateStatus(status) {
     // Backend now uses batch updates to prevent flickering
 }
 
+// The Log Output panel was removed from the dashboard (user request, 2026-10-17),
+// but the log lines still matter: they feed the Activity list and any future
+// consumer. consoleSink() returns the visible #console-output when it exists, or a
+// hidden detached-in-the-DOM div otherwise, so logging code keeps working unchanged.
+function consoleSink() {
+    const visible = document.getElementById('console-output');
+    if (visible) return visible;
+    let sink = document.getElementById('console-sink');
+    if (!sink) {
+        sink = document.createElement('div');
+        sink.id = 'console-sink';
+        sink.className = 'console-output';
+        sink.setAttribute('aria-hidden', 'true');
+        sink.style.cssText = 'display:none;position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);';
+        document.body.appendChild(sink);
+    }
+    return sink;
+}
+
 function addConsoleLine(message) {
     addConsoleLineRaw(message);
 }
 
 function addConsoleLineRaw(line) {
-    const console = document.getElementById('console-output');
+    const console = consoleSink();
     const div = document.createElement('div');
     div.textContent = line;
     console.appendChild(div);
@@ -3359,7 +3378,7 @@ function appendTrustedHelpContent(parent, text) {
         if (actEmpty) actEmpty.hidden = false;
     }
     resetActivity();
-    const consoleEl = $('console-output');
+    const consoleEl = consoleSink();
     if (consoleEl && 'MutationObserver' in window) {
         let pending = [];
         const flush = () => {
