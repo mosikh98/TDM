@@ -89,7 +89,9 @@ it directly from GitHub. Total time: a few minutes.
 > The dashboard works out its public address automatically: the browser proves it is
 > talking to its own origin (`Origin` + `Sec-Fetch-Site: same-origin`), so login cookies are
 > marked `Secure` and requests are checked against it even behind an HTTPS proxy. Setting
-> `PUBLIC_BASE_URL` is optional and, when set, always takes priority. Use the **root** URL only —
+> `PUBLIC_BASE_URL` is optional and, when set, always takes priority. On hosts whose variables
+> panel only offers generic names, `DATABASE_URL` is also accepted as the public address when it
+> holds a web address (`https://my-site.example`); real database URLs are ignored. Use the **root** URL only —
 > no path and no extra text; an invalid value stops the app from starting, with a message
 > that starts with `PUBLIC_BASE_URL must be…`. If the variable is missing, the app falls back
 > to the domain Railway injects automatically (`RAILWAY_PUBLIC_DOMAIN`), but setting it

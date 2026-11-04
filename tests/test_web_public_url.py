@@ -300,3 +300,34 @@ def test_unset_public_url_still_blocks_cross_origin_writes(public_client, header
     with public_client(url="", base_url="http://backend:8080") as client:
         assert client.post("/api/auth/settings", json=SETUP, headers=headers).status_code == 403
         assert not web.web_auth.enabled
+
+
+@pytest.mark.parametrize("value,expected", [
+    ("https://drops.example.com", PUBLIC),
+    ("https://drops.example.com/", PUBLIC),
+    (" drops.example.com ", PUBLIC),
+    ("\"https://drops.example.com/dashboard?x=1\"", PUBLIC),
+    ("http://localhost:8080", "http://localhost:8080"),
+    ("postgres://user:secret@db.example.com:5432/app", ""),
+    ("postgresql://db.example.com/app", ""),
+    ("https://user:secret@drops.example.com", ""),
+    ("", ""), ("   ", ""), ("not a url", ""),
+])
+def test_lenient_origin_for_fallback_variables(value, expected):
+    from src.web.origin import lenient_origin
+    assert lenient_origin(value) == expected
+
+
+def test_database_url_can_supply_the_public_url(monkeypatch):
+    for name in ("PUBLIC_BASE_URL", "PUBLIC-BASE-URL", "RAILWAY_PUBLIC_DOMAIN", "DATABASE_URL"):
+        monkeypatch.delenv(name, raising=False)
+    assert web._resolve_public_base_url() == ""
+    monkeypatch.setenv("DATABASE_URL", "drops.example.com")
+    assert web._resolve_public_base_url() == PUBLIC
+    monkeypatch.setenv("DATABASE_URL", "postgres://u:p@db/app")
+    assert web._resolve_public_base_url() == ""
+    monkeypatch.setenv("DATABASE_URL", "drops.example.com")
+    monkeypatch.setenv("PUBLIC-BASE-URL", "https://other.example.com")
+    assert web._resolve_public_base_url() == "https://other.example.com"
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://first.example.com")
+    assert web._resolve_public_base_url() == "https://first.example.com"

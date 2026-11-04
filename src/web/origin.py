@@ -87,3 +87,25 @@ class DashboardOrigin:
         if (proven := self._browser_origin(connection)) is not None:
             return proven.startswith("https://")
         return connection.scope["scheme"] in ("https", "wss")
+
+
+def lenient_origin(value: str) -> str:
+    """Best-effort public origin from a loosely written value; ``""`` if it is not one.
+
+    Used for fallback variables such as ``DATABASE_URL`` on hosts that only offer a
+    generic variable list. Accepts ``https://site.example/``, ``site.example`` (https is
+    assumed) and drops any path/query. Database URLs (``postgres://...``), credentials and
+    anything else that is not a web address yield ``""`` instead of raising.
+    """
+    value = value.strip().strip("\"'")
+    if not value:
+        return ""
+    if "://" not in value:
+        value = "https://" + value
+    try:
+        parts = urlsplit(value)
+        if parts.scheme.lower() not in ("http", "https") or not parts.netloc:
+            return ""
+        return DashboardOrigin._parse(f"{parts.scheme.lower()}://{parts.netloc}")
+    except ValueError:
+        return ""
