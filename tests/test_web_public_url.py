@@ -270,3 +270,33 @@ print(json.dumps(results))
         capture_output=True, text=True, timeout=20, check=True,
     )
     assert json.loads(result.stdout) == {"polling": 200, "websocket": True, "namespace": True}
+
+
+BROWSER = {"Sec-Fetch-Site": "same-origin"}
+
+
+def test_unset_public_url_autodetects_https_origin_behind_http_proxy(public_client):
+    """No PUBLIC_BASE_URL, proxy forwards plain HTTP and no forwarded headers."""
+    with public_client(url="", base_url="http://backend:8080", origin=PUBLIC) as client:
+        # Without the browser's same-origin proof the old strict behavior is unchanged.
+        assert client.get(POLLING).status_code == 403
+        client.headers.update(BROWSER)
+        assert client.get(POLLING).status_code == 200
+        with client.websocket_connect(WEBSOCKET, headers={"Upgrade": "websocket"}) as connection:
+            assert connection.receive_text().startswith("0")
+        setup = client.post("/api/auth/settings", json=SETUP)
+        assert setup.status_code == 200
+        assert "Secure" in setup.headers["set-cookie"]
+
+
+@pytest.mark.parametrize("headers", [
+    {"Origin": "https://evil.example", "Sec-Fetch-Site": "cross-site"},
+    {"Origin": "https://evil.example", "Sec-Fetch-Site": "same-site"},
+    {"Origin": "null", "Sec-Fetch-Site": "same-origin"},
+    {"Origin": "https://evil.example", "X-Forwarded-Host": "evil.example",
+     "X-Forwarded-Proto": "https"},
+])
+def test_unset_public_url_still_blocks_cross_origin_writes(public_client, headers):
+    with public_client(url="", base_url="http://backend:8080") as client:
+        assert client.post("/api/auth/settings", json=SETUP, headers=headers).status_code == 403
+        assert not web.web_auth.enabled

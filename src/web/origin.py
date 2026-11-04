@@ -1,4 +1,10 @@
-"""Dashboard public origin, independent of forwarded-header and client-IP trust."""
+"""Dashboard public origin, independent of forwarded-header and client-IP trust.
+
+``PUBLIC_BASE_URL`` is optional. Without it the dashboard works out its own address from
+what the *browser* proves about the request (``Origin`` + ``Sec-Fetch-Site: same-origin``),
+so it also works behind an HTTPS reverse proxy that forwards plain HTTP and no forwarded
+headers. No ``X-Forwarded-*`` header is ever trusted.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +14,9 @@ from urllib.parse import urlsplit
 
 from pydantic import AnyHttpUrl
 from starlette.requests import HTTPConnection
+
+
+_ORIGIN = re.compile(r"https?://(?:\[[0-9a-fA-F:.]+\]|[A-Za-z0-9_.-]+)(?::[0-9]{1,5})?")
 
 
 class DashboardOrigin:
@@ -49,13 +58,32 @@ class DashboardOrigin:
                 "credentials, a path, query, or fragment"
             ) from None
 
+    @staticmethod
+    def _browser_origin(connection: HTTPConnection) -> str | None:
+        """Return the page origin when the browser itself vouches that it is same-origin.
+
+        ``Sec-Fetch-Site`` is set by the browser (scripts and other sites cannot forge or
+        override it), and ``same-origin`` means the requesting page's origin is exactly the
+        origin it is talking to. Together with the ``Origin`` header this reveals the real
+        public scheme/host/port even when a proxy rewrites Host or downgrades HTTPS to HTTP.
+        Older browsers that do not send it fall back to the request-derived value.
+        """
+        if connection.headers.get("sec-fetch-site") != "same-origin":
+            return None
+        origin = connection.headers.get("origin", "")
+        return origin.lower() if _ORIGIN.fullmatch(origin) else None
+
     def expected(self, connection: HTTPConnection) -> str:
         if self.public_origin is not None:
             return self.public_origin
+        if (proven := self._browser_origin(connection)) is not None:
+            return proven
         scheme = "https" if connection.scope["scheme"] in ("https", "wss") else "http"
         return f"{scheme}://{connection.headers.get('host', '')}"
 
     def secure_cookie(self, connection: HTTPConnection) -> bool:
         if self.public_origin is not None:
             return self.public_origin.startswith("https://")
+        if (proven := self._browser_origin(connection)) is not None:
+            return proven.startswith("https://")
         return connection.scope["scheme"] in ("https", "wss")

@@ -70,9 +70,9 @@ it directly from GitHub. Total time: a few minutes.
 
 3. **Copy the generated domain**, for example `your-app-production.up.railway.app`, and put
    `https://` in front of it: `https://your-app-production.up.railway.app`.
-4. **Add it as a variable.** Open the service → **Variables → New Variable**, name it
-   **`PUBLIC_BASE_URL`** and paste the `https://…` address from step 3. Railway redeploys
-   by itself.
+4. **Nothing else to configure.** The dashboard detects its own public address, so
+   `PUBLIC_BASE_URL` is **optional**. Only add it (Variables → New Variable) if login still
+   fails behind your proxy.
 
    ![Railway: Variables → PUBLIC_BASE_URL](./docs/screenshots/railway-variables.jpg)
 
@@ -86,8 +86,10 @@ it directly from GitHub. Total time: a few minutes.
    your Twitch login, settings and dashboard password survive.
 
 > [!NOTE]
-> `PUBLIC_BASE_URL` tells the dashboard its real public HTTPS address, so login cookies are
-> marked `Secure` and browser requests are checked against it. Use the **root** URL only —
+> The dashboard works out its public address automatically: the browser proves it is
+> talking to its own origin (`Origin` + `Sec-Fetch-Site: same-origin`), so login cookies are
+> marked `Secure` and requests are checked against it even behind an HTTPS proxy. Setting
+> `PUBLIC_BASE_URL` is optional and, when set, always takes priority. Use the **root** URL only —
 > no path and no extra text; an invalid value stops the app from starting, with a message
 > that starts with `PUBLIC_BASE_URL must be…`. If the variable is missing, the app falls back
 > to the domain Railway injects automatically (`RAILWAY_PUBLIC_DOMAIN`), but setting it
